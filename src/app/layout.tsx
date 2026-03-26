@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/sidebar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Interview Coach",
+  title: "Prepr",
   description: "Interview coaching dashboard — track your pipeline, stories, scores, and coaching strategy.",
 };
 

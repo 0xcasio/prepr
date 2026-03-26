@@ -63,10 +63,10 @@ export function Sidebar() {
       {/* Logo / Brand */}
       <div className="flex items-center gap-2 px-5 py-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent)] text-white text-sm font-semibold font-[family-name:var(--font-sans)]">
-          IC
+          P
         </div>
         <span className="text-base font-semibold font-[family-name:var(--font-sans)] text-[var(--color-text-primary)]">
-          Interview Coach
+          Prepr
         </span>
       </div>
 
