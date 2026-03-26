@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* ===== Design System Tokens (from DESIGN_BRIEF.md) ===== */
+
+:root {
+  /* Core Colors */
+  --color-bg: #faf9f5;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f4f3ee;
+  --color-border: #e8e6dc;
+  --color-border-subtle: #f0efe8;
+  --color-text-primary: #141413;
+  --color-text-secondary: #5a5850;
+  --color-text-muted: #b0aea5;
+
+  /* Accent Colors (Blue) */
+  --color-accent: #4a8ec2;
+  --color-accent-hover: #3a7bab;
+  --color-accent-subtle: #e8f0f8;
+  --color-accent-muted: #6a9bcc;
+
+  /* Semantic Colors */
+  --color-success: #788c5d;
+  --color-success-subtle: #eef2e8;
+  --color-warning: #c9a227;
+  --color-warning-subtle: #faf5e4;
+  --color-danger: #c15f3c;
+  --color-danger-subtle: #faeee8;
+  --color-neutral: #b0aea5;
+
+  /* Dimension Colors (Scores) */
+  --color-dim-substance: #4a8ec2;
+  --color-dim-structure: #6a9bcc;
+  --color-dim-relevance: #788c5d;
+  --color-dim-credibility: #c9a227;
+  --color-dim-differentiation: #9b6b9e;
+
+  /* Spacing (base 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.035);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.06);
+
+  /* shadcn/ui compatible tokens */
+  --background: var(--color-bg);
+  --foreground: var(--color-text-primary);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text-primary);
+  --primary: var(--color-accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-surface-alt);
+  --secondary-foreground: var(--color-text-primary);
+  --muted: var(--color-surface-alt);
+  --muted-foreground: var(--color-text-secondary);
+  --accent: var(--color-accent-subtle);
+  --accent-foreground: var(--color-accent);
+  --destructive: var(--color-danger);
+  --destructive-foreground: #ffffff;
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-accent);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-poppins), "Poppins", system-ui, sans-serif;
+  --font-body: var(--font-lora), "Lora", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
