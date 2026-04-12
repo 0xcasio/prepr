@@ -19,7 +19,7 @@ const SUGGESTIONS = [
  * Main chat panel — message list + input.
  */
 export function ChatPanel() {
-  const { messages, isStreaming, error, sendMessage, clearMessages } =
+  const { messages, isStreaming, error, sendMessage, clearMessages, consumeQueuedCommand } =
     useChat();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -32,9 +32,14 @@ export function ChatPanel() {
     }
   }, [messages]);
 
-  // Focus input on mount
+  // Focus input on mount + consume queued command
   useEffect(() => {
     inputRef.current?.focus();
+    const queued = consumeQueuedCommand();
+    if (queued) {
+      sendMessage(queued);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = () => {

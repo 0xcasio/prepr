@@ -23,6 +23,10 @@ interface ChatContextValue {
   error: string | null;
   sendMessage: (content: string) => Promise<void>;
   clearMessages: () => void;
+  /** Queue a command to be auto-sent when the chat page mounts */
+  queueCommand: (command: string) => void;
+  /** Consume the queued command (called by ChatPanel on mount) */
+  consumeQueuedCommand: () => string | null;
 }
 
 const STORAGE_KEY = 'prepr-chat-history';
@@ -57,6 +61,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const queuedCommandRef = useRef<string | null>(null);
   // Use a ref to always have the latest messages without re-creating sendMessage
   const messagesRef = useRef<ChatMessage[]>(messages);
   messagesRef.current = messages;
@@ -191,9 +196,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsStreaming(false);
   }, []);
 
+  const queueCommand = useCallback((command: string) => {
+    queuedCommandRef.current = command;
+  }, []);
+
+  const consumeQueuedCommand = useCallback((): string | null => {
+    const cmd = queuedCommandRef.current;
+    queuedCommandRef.current = null;
+    return cmd;
+  }, []);
+
   return (
     <ChatContext.Provider
-      value={{ messages, isStreaming, error, sendMessage, clearMessages }}
+      value={{ messages, isStreaming, error, sendMessage, clearMessages, queueCommand, consumeQueuedCommand }}
     >
       {children}
     </ChatContext.Provider>

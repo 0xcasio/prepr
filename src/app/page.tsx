@@ -3,14 +3,14 @@
 import { LayoutDashboard, Loader2 } from 'lucide-react';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ConflictBanner } from '@/components/shared/conflict-banner';
+import { OnboardingBanner } from '@/components/dashboard/onboarding-banner';
 import { PipelineSummary } from '@/components/dashboard/pipeline-summary';
-import { UpcomingActions } from '@/components/dashboard/upcoming-actions';
+import { QuickActions } from '@/components/dashboard/quick-actions';
 import { ScoreSparkline } from '@/components/dashboard/score-sparkline';
 import { StrategyBar } from '@/components/dashboard/strategy-bar';
 import { useCoachingState } from '@/lib/hooks/useCoachingState';
 import { useFileEvents } from '@/lib/hooks/useFileEvents';
 import { useWriteState } from '@/lib/hooks/useWriteState';
-import { upcomingActions } from '@/lib/derived';
 
 export default function DashboardPage() {
   const { state, error, isLoading } = useCoachingState();
@@ -39,8 +39,6 @@ export default function DashboardPage() {
     );
   }
 
-  const actions = upcomingActions(state.interviewLoops);
-
   return (
     <div className="space-y-10 max-w-6xl">
       {/* Conflict banner */}
@@ -61,12 +59,15 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Onboarding / context-aware banner */}
+      <OnboardingBanner state={state} />
+
       {/* Active Pipeline */}
       <PipelineSummary loops={state.interviewLoops} />
 
-      {/* Bento row: Upcoming Actions + Score Sparkline */}
+      {/* Bento row: Quick Actions + Score Sparkline */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <UpcomingActions actions={actions} />
+        <QuickActions state={state} />
         <ScoreSparkline scores={state.scoreHistory.recentScores} />
       </div>
 
