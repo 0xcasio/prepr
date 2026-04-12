@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/sidebar";
+import { AuthGate } from "@/components/auth-gate";
+import { ChatProvider } from "@/lib/hooks/use-chat";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,12 +27,16 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex">
-        <TooltipProvider>
-          <Sidebar />
-          <main className="flex-1 flex flex-col overflow-auto p-6 lg:p-8">
-            {children}
-          </main>
-        </TooltipProvider>
+        <AuthGate>
+          <ChatProvider>
+            <TooltipProvider>
+              <Sidebar />
+              <main className="flex-1 flex flex-col overflow-auto p-6 lg:p-8">
+                {children}
+              </main>
+            </TooltipProvider>
+          </ChatProvider>
+        </AuthGate>
       </body>
     </html>
   );

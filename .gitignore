@@ -22,3 +22,6 @@ npm-debug.log*
 
 # Stitch prototypes (design artifacts, not source code)
 stitch/
+
+# Prepr local config (contains API key)
+.prepr/

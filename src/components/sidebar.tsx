@@ -7,14 +7,22 @@ import {
   Kanban,
   BookOpen,
   TrendingUp,
+  MessageSquare,
   HelpCircle,
   FileText,
   Settings,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { useChat } from "@/lib/hooks/use-chat";
 
 const navItems = [
+  {
+    label: "Coach",
+    href: "/chat",
+    icon: MessageSquare,
+  },
   {
     label: "Dashboard",
     href: "/",
@@ -57,6 +65,7 @@ const secondaryItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { isStreaming } = useChat();
 
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] sticky top-0">
@@ -76,6 +85,7 @@ export function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
+          const isCoach = item.href === "/chat";
           return (
             <Link
               key={item.href}
@@ -89,6 +99,10 @@ export function Sidebar() {
             >
               <item.icon className="h-4 w-4 shrink-0" />
               {item.label}
+              {/* Streaming indicator on Coach tab */}
+              {isCoach && isStreaming && !isActive && (
+                <Loader2 className="h-3 w-3 ml-auto animate-spin text-[var(--color-accent)]" />
+              )}
             </Link>
           );
         })}
