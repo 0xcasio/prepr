@@ -17,11 +17,20 @@ export interface ChatMessage {
   toolsUsed?: string[];
 }
 
+export interface StreamingStats {
+  startTime: number;
+  inputTokens: number;
+  outputTokens: number;
+  toolCalls: number;
+}
+
 interface ChatContextValue {
   messages: ChatMessage[];
   isStreaming: boolean;
   error: string | null;
+  streamingStats: StreamingStats | null;
   sendMessage: (content: string) => Promise<void>;
+  stopStreaming: () => void;
   clearMessages: () => void;
   /** Queue a command to be auto-sent when the chat page mounts */
   queueCommand: (command: string) => void;
@@ -60,8 +69,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>(loadMessages);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [streamingStats, setStreamingStats] = useState<StreamingStats | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const queuedCommandRef = useRef<string | null>(null);
+  const statsRef = useRef<StreamingStats | null>(null);
   // Use a ref to always have the latest messages without re-creating sendMessage
   const messagesRef = useRef<ChatMessage[]>(messages);
   messagesRef.current = messages;
@@ -87,6 +98,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }));
+
+    // Initialize streaming stats
+    const stats: StreamingStats = {
+      startTime: Date.now(),
+      inputTokens: 0,
+      outputTokens: 0,
+      toolCalls: 0,
+    };
+    statsRef.current = stats;
+    setStreamingStats({ ...stats });
 
     setIsStreaming(true);
     abortRef.current = new AbortController();
@@ -133,8 +154,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           switch (data.type) {
             case 'text':
               assistantMessage.content += data.text;
-              // Update state — this works even if /chat page is unmounted
-              // because the provider lives in the layout
               setMessages((prev) => {
                 const next = [...prev];
                 const existingIdx = next.findIndex(
@@ -151,6 +170,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             case 'tool_use':
               assistantMessage.toolsUsed?.push(data.name);
+              if (statsRef.current) {
+                statsRef.current.toolCalls++;
+                setStreamingStats({ ...statsRef.current });
+              }
+              break;
+
+            case 'usage':
+              if (statsRef.current) {
+                if (data.inputTokens) statsRef.current.inputTokens += data.inputTokens;
+                if (data.outputTokens) statsRef.current.outputTokens += data.outputTokens;
+                setStreamingStats({ ...statsRef.current });
+              }
               break;
 
             case 'error':
@@ -177,10 +208,39 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return final;
       });
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Save whatever we have so far
+        if (assistantMessage.content) {
+          setMessages((prev) => {
+            const final = [...prev];
+            const existingIdx = final.findIndex(
+              (m) => m.id === assistantMessage.id
+            );
+            if (existingIdx >= 0) {
+              final[existingIdx] = { ...assistantMessage };
+            } else {
+              final.push({ ...assistantMessage });
+            }
+            saveMessages(final);
+            return final;
+          });
+        }
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsStreaming(false);
+      abortRef.current = null;
+      // Keep stats visible for a moment after completion
+      if (statsRef.current) {
+        setStreamingStats({ ...statsRef.current });
+      }
+    }
+  }, []);
+
+  const stopStreaming = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
       abortRef.current = null;
     }
   }, []);
@@ -194,6 +254,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     saveMessages([]);
     setError(null);
     setIsStreaming(false);
+    setStreamingStats(null);
+    statsRef.current = null;
   }, []);
 
   const queueCommand = useCallback((command: string) => {
@@ -208,7 +270,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   return (
     <ChatContext.Provider
-      value={{ messages, isStreaming, error, sendMessage, clearMessages, queueCommand, consumeQueuedCommand }}
+      value={{ messages, isStreaming, error, streamingStats, sendMessage, stopStreaming, clearMessages, queueCommand, consumeQueuedCommand }}
     >
       {children}
     </ChatContext.Provider>

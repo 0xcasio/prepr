@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Rocket, BookOpen, Dumbbell, X } from 'lucide-react';
+import { Rocket, BookOpen, Dumbbell, X, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChat } from '@/lib/hooks/use-chat';
 import type { CoachingState } from '@/lib/parser/types';
@@ -14,12 +14,10 @@ interface OnboardingBannerProps {
 type BannerVariant = 'kickoff' | 'stories' | 'practice' | null;
 
 function detectVariant(state: CoachingState): BannerVariant {
-  // No storybank at all → suggest building stories
   if (state.storybank.length === 0) {
     return 'stories';
   }
 
-  // Has active loops but no recent practice (check score history)
   const hasActiveLoops = state.interviewLoops.some((loop) => {
     const status = loop.fields.find((f) => f.key.toLowerCase().includes('status'))?.value ?? '';
     return status.toLowerCase().includes('interviewing');
@@ -29,7 +27,6 @@ function detectVariant(state: CoachingState): BannerVariant {
     const recentScores = state.scoreHistory.recentScores;
     if (recentScores.length === 0) return 'practice';
 
-    // Check if last practice was more than 3 days ago
     const lastDate = recentScores[recentScores.length - 1]?.date;
     if (lastDate) {
       const last = new Date(lastDate + 'T00:00:00');
@@ -39,7 +36,6 @@ function detectVariant(state: CoachingState): BannerVariant {
     }
   }
 
-  // Everything looks healthy — no banner
   return null;
 }
 
@@ -52,23 +48,26 @@ const variants = {
     description: "Let's set up your coaching profile to get personalized interview coaching.",
     cta: 'Start Kickoff',
     command: 'kickoff',
-    gradient: 'from-[var(--color-accent)] to-blue-600',
+    iconColor: 'text-[var(--color-accent)]',
+    iconBg: 'bg-[var(--color-accent-subtle)]',
   },
   stories: {
     icon: BookOpen,
     title: 'Build your story arsenal',
-    description: "Your storybank is empty. Great interview answers start with strong stories — let's build yours.",
+    description: 'Your storybank is empty. Great answers start with strong stories.',
     cta: 'Build Stories',
     command: 'stories',
-    gradient: 'from-emerald-500 to-teal-600',
+    iconColor: 'text-[var(--color-success)]',
+    iconBg: 'bg-[var(--color-success-subtle)]',
   },
   practice: {
     icon: Dumbbell,
     title: 'Time to get sharp',
-    description: "You have active interviews coming up. A quick practice session keeps your delivery fresh.",
+    description: 'You have active interviews coming up. A quick practice session keeps your delivery fresh.',
     cta: 'Practice Now',
     command: 'practice',
-    gradient: 'from-purple-500 to-indigo-600',
+    iconColor: 'text-[var(--color-accent)]',
+    iconBg: 'bg-[var(--color-accent-subtle)]',
   },
 };
 
@@ -79,7 +78,6 @@ export function OnboardingBanner({ state }: OnboardingBannerProps) {
     if (typeof window === 'undefined') return false;
     const stored = localStorage.getItem(BANNER_DISMISSED_KEY);
     if (!stored) return false;
-    // Auto-expire dismissal after 24 hours
     const ts = parseInt(stored);
     return Date.now() - ts < 24 * 60 * 60 * 1000;
   });
@@ -102,34 +100,29 @@ export function OnboardingBanner({ state }: OnboardingBannerProps) {
   };
 
   return (
-    <div className={cn(
-      'relative rounded-[var(--radius-lg)] overflow-hidden',
-      'bg-gradient-to-r', config.gradient,
-      'p-6 md:p-8 text-white'
-    )}>
-      {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -mr-16 -mt-16" />
-      <div className="absolute bottom-0 right-24 w-24 h-24 bg-white/5 rounded-full -mb-8" />
-
-      {/* Dismiss button */}
+    <div className="relative bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] p-5 md:p-6">
+      {/* Dismiss */}
       <button
         onClick={handleDismiss}
-        className="absolute top-3 right-3 p-1.5 rounded-[var(--radius-sm)] hover:bg-white/20 transition-colors"
+        className="absolute top-3 right-3 p-1 rounded-[var(--radius-sm)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-alt)] transition-colors"
         aria-label="Dismiss"
       >
         <X className="h-4 w-4" />
       </button>
 
-      <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 shrink-0">
-          <Icon className="h-6 w-6" />
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-5 pr-6">
+        <div className={cn(
+          'flex items-center justify-center w-10 h-10 rounded-[var(--radius-md)] shrink-0',
+          config.iconBg
+        )}>
+          <Icon className={cn('h-5 w-5', config.iconColor)} />
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-bold font-[family-name:var(--font-sans)] mb-1">
+          <h3 className="text-sm font-semibold font-[family-name:var(--font-sans)] text-[var(--color-text-primary)] mb-0.5">
             {config.title}
           </h3>
-          <p className="text-sm text-white/85 font-[family-name:var(--font-body)] leading-relaxed">
+          <p className="text-xs text-[var(--color-text-secondary)] font-[family-name:var(--font-body)] leading-relaxed">
             {config.description}
           </p>
         </div>
@@ -137,14 +130,15 @@ export function OnboardingBanner({ state }: OnboardingBannerProps) {
         <button
           onClick={handleCTA}
           className={cn(
-            'px-5 py-2.5 rounded-[var(--radius-md)]',
-            'bg-white text-gray-900',
+            'flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)]',
+            'bg-[var(--color-text-primary)] text-white',
             'text-sm font-semibold font-[family-name:var(--font-sans)]',
-            'hover:bg-white/90 transition-colors',
+            'hover:opacity-90 transition-opacity',
             'shrink-0 cursor-pointer'
           )}
         >
           {config.cta}
+          <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>

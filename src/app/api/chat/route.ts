@@ -4,6 +4,7 @@ import {
   loadSystemPrompt,
   listReferenceFiles,
   readReferenceFile,
+  readReferenceFiles,
   readCoachingState,
   writeCoachingState,
 } from '@/lib/skill-loader';
@@ -11,28 +12,48 @@ import {
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
+const refFileList = listReferenceFiles().join(', ');
+
 /** Tool definitions given to Claude. */
 const TOOLS: Anthropic.Tool[] = [
   {
     name: 'read_reference',
     description:
-      'Read a reference file from the interview coaching skill. Available files: ' +
-      listReferenceFiles().join(', '),
+      'Read a single reference file. Prefer read_reference_batch when you need multiple files. Available files: ' +
+      refFileList,
     input_schema: {
       type: 'object' as const,
       properties: {
         path: {
           type: 'string',
           description:
-            'Relative path to the reference file, e.g. "references/commands/analyze.md" or "references/rubrics-detailed.md"',
+            'Relative path to the reference file, e.g. "references/commands/analyze.md"',
         },
       },
       required: ['path'],
     },
   },
   {
+    name: 'read_reference_batch',
+    description:
+      'Read multiple reference files in one call — much faster than multiple read_reference calls. Use this whenever a command requires multiple files (e.g., analyze needs transcript-processing.md + rubrics-detailed.md + cross-cutting.md). Available files: ' +
+      refFileList,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        paths: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Array of relative paths, e.g. ["references/commands/practice.md", "references/role-drills.md"]',
+        },
+      },
+      required: ['paths'],
+    },
+  },
+  {
     name: 'read_coaching_state',
-    description: 'Read the current coaching_state.md file to get the latest candidate data.',
+    description: 'Read the current coaching_state.md file to get the latest candidate data. Always call this at the start of a conversation.',
     input_schema: {
       type: 'object' as const,
       properties: {},
@@ -58,19 +79,27 @@ const TOOLS: Anthropic.Tool[] = [
 /** Handle a tool call and return the result. */
 function handleToolCall(
   name: string,
-  input: Record<string, string>
+  input: Record<string, unknown>
 ): string {
   switch (name) {
     case 'read_reference': {
-      const content = readReferenceFile(input.path);
+      const content = readReferenceFile(input.path as string);
       return content ?? `File not found: ${input.path}`;
+    }
+    case 'read_reference_batch': {
+      const paths = input.paths as string[];
+      const results = readReferenceFiles(paths);
+      // Return as a combined document with clear separators
+      return Object.entries(results)
+        .map(([path, content]) => `--- ${path} ---\n${content}`)
+        .join('\n\n');
     }
     case 'read_coaching_state': {
       const state = readCoachingState();
       return state ?? 'No coaching_state.md found.';
     }
     case 'write_coaching_state': {
-      const ok = writeCoachingState(input.content);
+      const ok = writeCoachingState(input.content as string);
       return ok
         ? 'coaching_state.md updated successfully.'
         : 'Failed to write coaching_state.md.';
@@ -97,7 +126,6 @@ export async function POST(req: Request) {
   const systemPrompt = loadSystemPrompt();
 
   // Agentic loop: keep calling Claude until we get a final text response.
-  // This handles multi-step tool use (e.g., read reference → generate response).
   const allMessages: Anthropic.MessageParam[] = [...messages];
   const encoder = new TextEncoder();
 
@@ -129,6 +157,21 @@ export async function POST(req: Request) {
 
           for await (const event of response) {
             switch (event.type) {
+              case 'message_start':
+                // Send input token count
+                if (event.message?.usage) {
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: 'usage',
+                        inputTokens: event.message.usage.input_tokens,
+                        outputTokens: 0,
+                      })}\n\n`
+                    )
+                  );
+                }
+                break;
+
               case 'content_block_start':
                 if (event.content_block.type === 'text') {
                   // Start of text block
@@ -142,7 +185,6 @@ export async function POST(req: Request) {
               case 'content_block_delta':
                 if (event.delta.type === 'text_delta') {
                   currentText += event.delta.text;
-                  // Stream text chunks to the client
                   controller.enqueue(
                     encoder.encode(
                       `data: ${JSON.stringify({ type: 'text', text: event.delta.text })}\n\n`
@@ -168,13 +210,21 @@ export async function POST(req: Request) {
 
               case 'message_delta':
                 stopReason = event.delta.stop_reason;
+                if ((event as any).usage?.output_tokens) {
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: 'usage',
+                        outputTokens: (event as any).usage.output_tokens,
+                      })}\n\n`
+                    )
+                  );
+                }
                 break;
             }
           }
 
           if (stopReason === 'tool_use' && toolUseBlocks.length > 0) {
-            // Build the assistant message with all content blocks
-            // Use Anthropic.ContentBlockParam for constructing messages
             const assistantContent: Anthropic.ContentBlockParam[] = [];
             if (currentText) {
               assistantContent.push({ type: 'text', text: currentText });
@@ -199,7 +249,7 @@ export async function POST(req: Request) {
             // Execute all tool calls and build tool results
             const toolResults: Anthropic.ToolResultBlockParam[] =
               toolUseBlocks.map((tool) => {
-                let parsedInput: Record<string, string> = {};
+                let parsedInput: Record<string, unknown> = {};
                 try {
                   parsedInput = JSON.parse(tool.input || '{}');
                 } catch {
@@ -231,7 +281,6 @@ export async function POST(req: Request) {
             currentText = '';
             toolUseBlocks = [];
           } else {
-            // No tool use — we're done
             continueLoop = false;
           }
         }

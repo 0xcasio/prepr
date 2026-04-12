@@ -1,8 +1,8 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { Send, RotateCcw, Loader2, Wrench } from 'lucide-react';
-import { useChat, type ChatMessage } from '@/lib/hooks/use-chat';
+import { Send, RotateCcw, Loader2, Square, Zap, Clock } from 'lucide-react';
+import { useChat, type ChatMessage, type StreamingStats } from '@/lib/hooks/use-chat';
 import { ChatBubble } from './chat-bubble';
 import { cn } from '@/lib/utils';
 
@@ -15,11 +15,75 @@ const SUGGESTIONS = [
   'prep',
 ];
 
+/** Format elapsed seconds as m:ss */
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${sec}s`;
+}
+
+/** Format token count as compact number */
+function formatTokens(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+/**
+ * Streaming status bar — shows elapsed time, tokens, and tool calls.
+ */
+function StreamingStatusBar({
+  stats,
+  isStreaming,
+}: {
+  stats: StreamingStats;
+  isStreaming: boolean;
+}) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      // Show final elapsed time
+      setElapsed(Date.now() - stats.startTime);
+      return;
+    }
+
+    // Tick every second while streaming
+    const interval = setInterval(() => {
+      setElapsed(Date.now() - stats.startTime);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isStreaming, stats.startTime]);
+
+  const totalTokens = stats.inputTokens + stats.outputTokens;
+
+  return (
+    <div className="flex items-center gap-4 text-[10px] font-mono text-[var(--color-text-muted)] select-none">
+      <span className="flex items-center gap-1">
+        <Clock className="h-3 w-3" />
+        {formatElapsed(elapsed)}
+      </span>
+      {totalTokens > 0 && (
+        <span className="flex items-center gap-1">
+          <Zap className="h-3 w-3" />
+          {formatTokens(totalTokens)} tokens
+        </span>
+      )}
+      {stats.toolCalls > 0 && (
+        <span className="text-[var(--color-accent)]">
+          {stats.toolCalls} tool {stats.toolCalls === 1 ? 'call' : 'calls'}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /**
  * Main chat panel — message list + input.
  */
 export function ChatPanel() {
-  const { messages, isStreaming, error, sendMessage, clearMessages, consumeQueuedCommand } =
+  const { messages, isStreaming, error, streamingStats, sendMessage, stopStreaming, clearMessages, consumeQueuedCommand } =
     useChat();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -91,8 +155,8 @@ export function ChatPanel() {
         )}
 
         {error && (
-          <div className="max-w-3xl mx-auto mt-4 bg-red-50 border border-red-200 rounded-[var(--radius-md)] p-3">
-            <p className="text-sm text-red-700 font-[family-name:var(--font-body)]">
+          <div className="max-w-3xl mx-auto mt-4 bg-[var(--color-danger-subtle)] border border-[var(--color-danger)] rounded-[var(--radius-md)] p-3">
+            <p className="text-sm text-[var(--color-danger)] font-[family-name:var(--font-body)]">
               {error}
             </p>
           </div>
@@ -102,6 +166,13 @@ export function ChatPanel() {
       {/* Input area */}
       <div className="border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 lg:px-8 py-4">
         <div className="max-w-3xl mx-auto">
+          {/* Streaming stats bar */}
+          {streamingStats && (
+            <div className="mb-2">
+              <StreamingStatusBar stats={streamingStats} isStreaming={isStreaming} />
+            </div>
+          )}
+
           <div className="flex items-end gap-3">
             <div className="flex-1 relative">
               <textarea
@@ -134,33 +205,43 @@ export function ChatPanel() {
               />
             </div>
 
-            <button
-              onClick={handleSubmit}
-              disabled={!input.trim() || isStreaming}
-              className={cn(
-                'flex items-center justify-center w-10 h-10 rounded-[var(--radius-md)]',
-                'bg-[var(--color-text-primary)] text-white',
-                'hover:opacity-90 transition-opacity',
-                'disabled:opacity-30 disabled:cursor-not-allowed'
-              )}
-              aria-label="Send message"
-            >
-              {isStreaming ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
+            {/* Send or Stop button */}
+            {isStreaming ? (
+              <button
+                onClick={stopStreaming}
+                className={cn(
+                  'flex items-center justify-center w-10 h-10 rounded-[var(--radius-md)]',
+                  'bg-[var(--color-danger)] text-white',
+                  'hover:opacity-90 transition-opacity'
+                )}
+                aria-label="Stop generating"
+                title="Stop generating"
+              >
+                <Square className="h-4 w-4 fill-current" />
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={!input.trim()}
+                className={cn(
+                  'flex items-center justify-center w-10 h-10 rounded-[var(--radius-md)]',
+                  'bg-[var(--color-text-primary)] text-white',
+                  'hover:opacity-90 transition-opacity',
+                  'disabled:opacity-30 disabled:cursor-not-allowed'
+                )}
+                aria-label="Send message"
+              >
                 <Send className="h-4 w-4" />
-              )}
-            </button>
+              </button>
+            )}
 
-            {messages.length > 0 && (
+            {messages.length > 0 && !isStreaming && (
               <button
                 onClick={clearMessages}
-                disabled={isStreaming}
                 className={cn(
                   'flex items-center justify-center w-10 h-10 rounded-[var(--radius-md)]',
                   'border border-[var(--color-border)] text-[var(--color-text-muted)]',
-                  'hover:bg-[var(--color-surface-alt)] transition-colors',
-                  'disabled:opacity-30'
+                  'hover:bg-[var(--color-surface-alt)] transition-colors'
                 )}
                 aria-label="Clear chat"
                 title="New session"
